@@ -17,10 +17,12 @@ func init() {
 
 func main() {
 	flag.Parse()
+
 	s := server{
 		out:    os.Stdout,
 		errors: os.Stderr,
 	}
+
 	if err := http.ListenAndServe(options.Host, &s); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 	}
