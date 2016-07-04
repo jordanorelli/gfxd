@@ -38,7 +38,7 @@ func TestParseColor(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		c := parseColor(tt.in)
+		c := parseColor(tt.in, white)
 		if eq(c, tt.out) {
 			t.Logf("ok: '%s' == %v", tt.in, c)
 		} else {

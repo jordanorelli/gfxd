@@ -12,6 +12,10 @@ import (
 	"strings"
 )
 
+var (
+	white = color.RGBA{0xff, 0xff, 0xff, 0xff}
+)
+
 type server struct {
 	out    io.Writer
 	errors io.Writer
@@ -29,58 +33,62 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	width := 400
-	width_s := r.URL.Query().Get("w")
-	if width_s != "" {
-		n, err := strconv.Atoi(width_s)
-		if err == nil {
-			width = n
-		}
-	}
+	width := parseInt(r.URL.Query().Get("w"), 400)
+	height := parseInt(r.URL.Query().Get("h"), 400)
+	bg := parseColor(r.URL.Query().Get("bg"), white)
 
-	height := 400
-	height_s := r.URL.Query().Get("h")
-	if height_s != "" {
-		n, err := strconv.Atoi(height_s)
-		if err == nil {
-			height = n
-		}
-	}
-
-	bg := parseColor(r.URL.Query().Get("bg"))
 	m := image.NewRGBA(image.Rect(0, 0, width, height))
 	draw.Draw(m, m.Bounds(), &image.Uniform{bg}, m.Bounds().Min, draw.Src)
 	encoder.WriteImage(w, m)
 }
 
-func parseColor(c_s string) color.RGBA {
+// parses an integer from a user string. If the user string is invalid, return
+// the suuplied default int.
+func parseInt(i_s string, i int) int {
+	n, err := strconv.Atoi(i_s)
+	if err != nil {
+		return i
+	}
+	return n
+}
+
+// parses a color from a user string. If the user string is invalid, return the
+// supplied default color.
+func parseColor(c_s string, d color.RGBA) color.RGBA {
+	var err error
 	f := func(s string) (n uint8) {
 		if len(s) != 2 {
+			err = coalesce(err, fmt.Errorf("input too long"))
 			return 0
 		}
-		i, err := strconv.ParseUint(s, 16, 0)
-		if err != nil {
+		i, e := strconv.ParseUint(s, 16, 0)
+		if e != nil {
+			err = coalesce(err, e)
 			return 0
 		}
 		return uint8(i)
 	}
 
-	white := color.RGBA{0xff, 0xff, 0xff, 0xff}
+	var c color.RGBA
 	c_s = strings.ToLower(c_s)
 	switch len(c_s) {
 	case 2:
 		n := f(c_s[0:2])
-		return color.RGBA{n, n, n, 0xff}
+		c = color.RGBA{n, n, n, 0xff}
 	case 4:
 		n, a := f(c_s[0:2]), f(c_s[2:4])
-		return color.RGBA{n, n, n, a}
+		c = color.RGBA{n, n, n, a}
 	case 6:
-		return color.RGBA{f(c_s[0:2]), f(c_s[2:4]), f(c_s[4:6]), 0xff}
+		c = color.RGBA{f(c_s[0:2]), f(c_s[2:4]), f(c_s[4:6]), 0xff}
 	case 8:
-		return color.RGBA{f(c_s[0:2]), f(c_s[2:4]), f(c_s[4:6]), f(c_s[6:8])}
+		c = color.RGBA{f(c_s[0:2]), f(c_s[2:4]), f(c_s[4:6]), f(c_s[6:8])}
 	default:
-		return white
+		return d
 	}
+	if err != nil {
+		return d
+	}
+	return c
 }
 
 type imageWriter interface {
