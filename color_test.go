@@ -5,13 +5,6 @@ import (
 	"testing"
 )
 
-var (
-	white = color.RGBA{0xff, 0xff, 0xff, 0xff}
-	red   = color.RGBA{0xff, 0, 0, 0xff}
-	green = color.RGBA{0, 0xff, 0, 0xff}
-	blue  = color.RGBA{0, 0, 0xff, 0xff}
-)
-
 func TestParseColor(t *testing.T) {
 	white := color.RGBA{0xff, 0xff, 0xff, 0xff}
 

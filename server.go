@@ -14,6 +14,9 @@ import (
 
 var (
 	white = color.RGBA{0xff, 0xff, 0xff, 0xff}
+	red   = color.RGBA{0xff, 0, 0, 0xff}
+	green = color.RGBA{0, 0xff, 0, 0xff}
+	blue  = color.RGBA{0, 0, 0xff, 0xff}
 )
 
 type server struct {
@@ -27,6 +30,7 @@ func (s *server) logReceived(r *http.Request) {
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.logReceived(r)
+
 	encoder, err := getEncoding(r)
 	if err != nil {
 		s.writeError(w, err)
@@ -36,9 +40,29 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	width := parseInt(r.URL.Query().Get("w"), 400)
 	height := parseInt(r.URL.Query().Get("h"), 400)
 	bg := parseColor(r.URL.Query().Get("bg"), white)
+	data := parseSeries(r.URL.Query().Get("s"), series{})
 
+	// create a new canvas
 	m := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	// paint the background
 	draw.Draw(m, m.Bounds(), &image.Uniform{bg}, m.Bounds().Min, draw.Src)
+
+	// compute column dimensions
+	num_cols := data.len()
+	col_width := width
+	if num_cols > 0 {
+		col_width = width / num_cols // float here?
+	}
+
+	fg := &image.Uniform{blue}
+	for idx, val := range data {
+		col_height_n := norm(val, data.min(), data.max())
+		col_height := int(col_height_n * float64(height))
+		x := idx * col_width
+		rect := image.Rect(x, height, x+col_width, height-col_height)
+		draw.Draw(m, rect, fg, image.ZP, draw.Src)
+	}
 	encoder.WriteImage(w, m)
 }
 
@@ -89,6 +113,62 @@ func parseColor(c_s string, d color.RGBA) color.RGBA {
 		return d
 	}
 	return c
+}
+
+type series []int
+
+// minimum value in the series
+func (s series) min() int {
+	switch len(s) {
+	case 0:
+		return 0
+	case 1:
+		return s[0]
+	default:
+	}
+	m := s[0]
+	for _, i := range s[1:] {
+		if i < m {
+			m = i
+		}
+	}
+	return m
+}
+
+// maximum value in the series
+func (s series) max() int {
+	switch len(s) {
+	case 0:
+		return 0
+	case 1:
+		return s[0]
+	default:
+	}
+	m := s[0]
+	for _, i := range s[1:] {
+		if i > m {
+			m = i
+		}
+	}
+	return m
+}
+
+func (s series) len() int {
+	return len(s)
+}
+
+// parses a user-supplied series
+func parseSeries(s string, missing series) series {
+	parts := strings.Split(s, ",")
+	out := make(series, 0, len(parts))
+	for _, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil {
+			return missing
+		}
+		out = append(out, n)
+	}
+	return out
 }
 
 type imageWriter interface {
